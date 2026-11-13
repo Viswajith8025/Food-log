@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { parse } from './parse.ts'
-import { applyLlmFallback, type AiEstimate, type LlmCache } from './llmFallback.ts'
+import { applyLlmFallback, genericAiName, type AiEstimate, type LlmCache } from './llmFallback.ts'
 import type { ParsedItem } from './types.ts'
 
 function memoryCache(): LlmCache & { size: number } {
@@ -55,11 +55,23 @@ describe('applyLlmFallback', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
+  it('does not spend a model call on gibberish', async () => {
+    const fetchImpl = vi.fn()
+    const result = await applyLlmFallback(parse('idk'), { cache: memoryCache(), fetchImpl })
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(result[0].name).toBe('Not recognised - tap to pick')
+  })
+
+  it('keeps the name the person said when the model invents a variant', () => {
+    expect(genericAiName('pizza', 'Chicken Tikka Pizza')).toBe('Pizza')
+    expect(genericAiName('kothu parotta', 'Kothu Parotta')).toBe('Kothu Parotta')
+  })
+
   it('names a miss so the meal can still be saved', async () => {
     const fetchImpl = vi.fn(async () => new Response('no', { status: 503 }))
     const items = parse('xyz random food')
     const result = await applyLlmFallback(items, { cache: memoryCache(), fetchImpl })
-    expect(result[0].name).toBe('Unknown — tap to fix')
+    expect(result[0].name).toBe('Not recognised - tap to pick')
     expect(result[0].foodId).toBeNull()
   })
 

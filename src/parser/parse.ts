@@ -8,6 +8,7 @@ import {
   getFood,
 } from '../data/search.ts'
 import { escapeReg, normalize } from './normalize.ts'
+import { withQtyUnit } from './portion.ts'
 import type { Confidence, ParsedItem, UserAlias } from './types.ts'
 
 const NUMBER_WORDS: Record<string, number> = {
@@ -85,9 +86,36 @@ const UNITS: Record<string, Unit> = {
   gms: 'g',
   gram: 'g',
   grams: 'g',
+  ml: 'ml',
+  milliliter: 'ml',
+  milliliters: 'ml',
+  millilitre: 'ml',
 }
 
-const FILLERS = new Set(['of', 'a', 'an', 'the', 'some', 'thoda', 'thodi', 'little', 'please', 'just', 'only', 'and', 'aur', 'with', 'n'])
+const FILLERS = new Set([
+  'of', 'a', 'an', 'the', 'some', 'thoda', 'thodi', 'little', 'please', 'just', 'only', 'and', 'aur', 'with', 'n',
+  'aaj', 'subah', 'shaam', 'sham', 'raat', 'khaya', 'khayi', 'khaye', 'liya', 'liye', 'piya', 'piye', 'maine',
+  'tha', 'thi', 'ate', 'had', 'breakfast', 'lunch', 'dinner', 'for',
+  'nothing', 'idk', 'asdf', 'lol', 'hmm', 'blah', 'whatever',
+])
+
+const NON_FOOD = new Set(['idk', 'asdf', 'nothing', 'xyz', 'lol', 'hmm', 'blah', 'wtf', 'foo', 'bar', 'nah', 'nope', 'haha', 'dunno', 'random'])
+
+const CEREAL_BASES = new Set(['oats', 'cornflakes', 'coffee', 'chai'])
+
+const ADDON_PORTION: Record<string, { qty: number; unit: Unit }> = {
+  milk: { qty: 100, unit: 'ml' },
+  curd: { qty: 50, unit: 'g' },
+  ghee: { qty: 1, unit: 'tsp' },
+  sugar: { qty: 1, unit: 'tsp' },
+}
+
+/** A fragment is worth a model call only when it has a real word, not "idk". */
+export function worthAsking(text: string): boolean {
+  return normalize(text)
+    .split(/\s+/)
+    .some((word) => /^[a-z]{3,}$/.test(word) && !FILLERS.has(word) && !NON_FOOD.has(word) && /[aeiou]/.test(word))
+}
 const EGG_WORDS = new Set(['egg', 'eggs', 'anda'])
 
 interface Classified {
@@ -247,10 +275,10 @@ function materialize(
   score?: number,
 ): ParsedItem {
   let chosen = unit
-  if (chosen && chosen !== 'g' && food.servings[chosen] == null) chosen = null
+  if (chosen && chosen !== 'g' && chosen !== 'ml' && food.servings[chosen] == null) chosen = null
   const finalQty = qty ?? (chosen ? 1 : food.defaultServing.qty)
   const finalUnit = chosen ?? food.defaultServing.unit
-  const unitGrams = finalUnit === 'g' ? 1 : food.servings[finalUnit] ?? food.servings[food.defaultServing.unit] ?? 100
+  const unitGrams = finalUnit === 'g' || finalUnit === 'ml' ? 1 : food.servings[finalUnit] ?? food.servings[food.defaultServing.unit] ?? 100
   const grams = Math.round(finalQty * unitGrams)
   const factor = grams / 100
   return {
@@ -275,11 +303,12 @@ function materialize(
 }
 
 function unknownItem(raw: string, phrase: string, qty: number | null, unit: Unit | null): ParsedItem {
+  const ask = worthAsking(phrase)
   return {
     raw,
     query: phrase,
     foodId: null,
-    name: phrase || raw,
+    name: ask ? phrase || raw : 'Not recognised - tap to pick',
     qty: qty ?? 1,
     unit: unit ?? 'piece',
     grams: 0,
@@ -288,6 +317,7 @@ function unknownItem(raw: string, phrase: string, qty: number | null, unit: Unit
     confidence: 'low',
     alternatives: [],
     source: 'unknown',
+    askModel: ask,
   }
 }
 
@@ -315,13 +345,17 @@ function parseSegment(segment: string, userAliases: UserAlias[]): ParsedItem[] {
   if (foodAt.length === 0) {
     const words = tokens.filter((token) => token.kind === 'word').map((token) => token.text)
     const phrase = words.join(' ')
-    if (!phrase) return []
+    if (!phrase) {
+      const bare = segment.trim()
+      return NON_FOOD.has(bare) ? [unknownItem(bare, bare, null, null)] : []
+    }
     const { qty, unit } = takeQtyUnit(tokens)
     const exactId = exactFoodId(phrase)
     if (exactId) {
       const food = getFood(exactId)
       if (food) return [materialize(food, 'exact', phrase, qty, unit, [qty, unit, phrase].filter(Boolean).join(' ') || phrase)]
     }
+    if (!worthAsking(phrase)) return [unknownItem(phrase, phrase, qty, unit)]
     const fuzzy = fuzzyFood(phrase)
     if (fuzzy) {
       const food = getFood(fuzzy.foodId)
@@ -412,6 +446,37 @@ function unglue(text: string): string {
     .join(' ')
 }
 
+function flagLot(item: ParsedItem): ParsedItem {
+  const counted = item.unit !== 'g' && item.unit !== 'ml'
+  if ((counted && item.qty > 20) || item.kcal > 3000) {
+    return { ...item, confidence: 'low', note: "That's a lot - check quantity", askModel: false }
+  }
+  return item
+}
+
+function softenAddons(items: ParsedItem[]): ParsedItem[] {
+  return items.map((item, index) => {
+    const previous = items[index - 1]
+    const addon = item.foodId ? ADDON_PORTION[item.foodId] : undefined
+    if (!addon || !previous?.foodId || !CEREAL_BASES.has(previous.foodId)) return item
+    return withQtyUnit(item, addon.qty, addon.unit)
+  })
+}
+
+function mergeSame(items: ParsedItem[]): ParsedItem[] {
+  const merged: ParsedItem[] = []
+  for (const item of items) {
+    const previous = item.foodId ? merged.find((row) => row.foodId === item.foodId && row.unit === item.unit) : undefined
+    if (!previous) {
+      merged.push(item)
+      continue
+    }
+    const combined = withQtyUnit(previous, previous.qty + item.qty, previous.unit)
+    Object.assign(previous, combined, { raw: `${previous.raw}, ${item.raw}`, query: previous.query })
+  }
+  return merged
+}
+
 export function parse(text: string, userAliases: UserAlias[] = []): ParsedItem[] {
   const normalized = unglue(normalize(text))
   if (!normalized) return []
@@ -420,5 +485,5 @@ export function parse(text: string, userAliases: UserAlias[] = []): ParsedItem[]
     .split(/\s*(?:,|&|\+)\s*|\s+(?:and|aur|with|n)\s+/g)
     .map((segment) => segment.trim())
     .filter(Boolean)
-  return segments.flatMap((segment) => parseSegment(segment, userAliases))
+  return mergeSame(softenAddons(segments.flatMap((segment) => parseSegment(segment, userAliases)))).map(flagLot)
 }

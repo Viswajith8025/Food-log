@@ -22,4 +22,6 @@ export interface ParsedItem {
   alternatives: string[]
   note?: string
   source: MatchSource
+  /** False when the fragment is gibberish and must not be sent to a model. */
+  askModel?: boolean
 }

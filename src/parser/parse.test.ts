@@ -197,6 +197,45 @@ describe('parse', () => {
     expect(parsed[1].confidence).toBe('low')
   })
 
+  it('refuses gibberish instead of guessing a meal', () => {
+    for (const text of ['idk', 'asdf', 'nothing']) {
+      const item = parse(text)[0]
+      expect(item.foodId).toBeNull()
+      expect(item.name).toBe('Not recognised - tap to pick')
+      expect(item.askModel).toBe(false)
+    }
+  })
+
+  it('drops hinglish around the food', () => {
+    expect(parse('aaj subah 2 idli khaya')[0]).toMatchObject({ foodId: 'idli', qty: 2, unit: 'piece' })
+  })
+
+  it('flags a quantity nobody ate', () => {
+    const item = parse('5000 roti')[0]
+    expect(item.foodId).toBe('roti')
+    expect(item.qty).toBe(5000)
+    expect(item.confidence).toBe('low')
+    expect(item.askModel).toBe(false)
+    expect(item.note).toMatch(/a lot/i)
+    expect(item.kcal).toBeGreaterThan(3000)
+  })
+
+  it('adds a splash of milk to oats, not a full glass', () => {
+    const milk = parse('oats with milk').find((item) => item.foodId === 'milk')
+    expect(milk).toMatchObject({ qty: 100, unit: 'ml', grams: 100 })
+    expect(parse('do paratha with curd').find((item) => item.foodId === 'curd')?.grams).toBeGreaterThan(100)
+  })
+
+  it('folds a repeated food into one card', () => {
+    expect(parse('roti roti')).toMatchObject([{ foodId: 'roti', qty: 2, unit: 'piece' }])
+    expect(parse('1 roti and 1 roti')[0]).toMatchObject({ foodId: 'roti', qty: 2 })
+  })
+
+  it('reads a weight as a weight', () => {
+    expect(parse('100g paneer')[0]).toMatchObject({ qty: 100, unit: 'g' })
+    expect(parse('200 ml milk')[0]).toMatchObject({ foodId: 'milk', qty: 200, unit: 'ml', grams: 200 })
+  })
+
   it('ignores an empty note', () => {
     expect(parse('')).toEqual([])
     expect(parse('   , and  ')).toEqual([])

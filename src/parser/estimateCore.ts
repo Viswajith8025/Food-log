@@ -6,7 +6,8 @@ One object per fragment, same order.
 grams, kcal, protein, carbs, and fat are for the portion they described, not per 100g.
 If they gave no amount, use one typical home serving.
 Prefer Indian home cooking. confidence is 0 to 1.
-If the fragment is not food, still return a best effort with confidence under 0.3.`
+If the fragment is not food, return {"unknown":true} for that item. Do not invent a dish.
+Name only what they said. "pizza" is "Pizza", not "Chicken Tikka Pizza".`
 
 function stripFence(text: string): string {
   return text.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
@@ -21,6 +22,9 @@ export function parseEstimatePayload(text: string, count: number): AiEstimate[] 
       return { name: 'Unknown food', grams: 0, kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 0 }
     }
     const value = row as Record<string, unknown>
+    if (value.unknown === true) {
+      return { name: '', grams: 0, kcal: 0, protein: 0, carbs: 0, fat: 0, confidence: 0, unknown: true }
+    }
     return {
       name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : 'Unknown food',
       grams: Number(value.grams) || 0,

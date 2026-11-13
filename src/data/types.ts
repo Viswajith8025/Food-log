@@ -10,8 +10,9 @@ export type Unit =
   | 'slice'
   | 'pack'
   | 'g'
+  | 'ml'
 
-export type ServingUnit = Exclude<Unit, 'g'>
+export type ServingUnit = Exclude<Unit, 'g' | 'ml'>
 
 export interface Macros {
   protein: number

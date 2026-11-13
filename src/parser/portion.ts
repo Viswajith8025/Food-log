@@ -6,8 +6,14 @@ function roundMacro(value: number): number {
   return Math.round(value * 10) / 10
 }
 
+export function formatAmount(qty: number, unit: Unit): string {
+  const shown = Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 10) / 10)
+  if (unit === 'g' || unit === 'ml') return `${shown} ${unit}`
+  return `${shown} × ${unit}`
+}
+
 export function withQtyUnit(item: ParsedItem, qty: number, unit: Unit): ParsedItem {
-  const nextQty = Math.max(0.5, Math.round(qty * 2) / 2)
+  const nextQty = unit === 'g' || unit === 'ml' ? Math.max(1, Math.round(qty)) : Math.max(0.5, Math.round(qty * 2) / 2)
   const food = getFood(item.foodId)
   if (!food) {
     const ratio = item.qty > 0 ? nextQty / item.qty : 1
@@ -24,8 +30,9 @@ export function withQtyUnit(item: ParsedItem, qty: number, unit: Unit): ParsedIt
       },
     }
   }
-  const usable = unit !== 'g' && food.servings[unit] != null ? unit : unit === 'g' ? 'g' : food.defaultServing.unit
-  const unitGrams = usable === 'g' ? 1 : food.servings[usable] ?? 100
+  const direct = unit === 'g' || unit === 'ml'
+  const usable = direct || food.servings[unit] != null ? unit : food.defaultServing.unit
+  const unitGrams = usable === 'g' || usable === 'ml' ? 1 : food.servings[usable] ?? 100
   const grams = Math.round(nextQty * unitGrams)
   const factor = grams / 100
   return {
@@ -45,7 +52,7 @@ export function withQtyUnit(item: ParsedItem, qty: number, unit: Unit): ParsedIt
 export function withFood(item: ParsedItem, foodId: string): ParsedItem {
   const food = getFood(foodId)
   if (!food) return item
-  const unit = item.unit !== 'g' && food.servings[item.unit] != null ? item.unit : food.defaultServing.unit
+  const unit = item.unit === 'g' || item.unit === 'ml' || food.servings[item.unit] != null ? item.unit : food.defaultServing.unit
   const next = withQtyUnit({ ...item, foodId, source: 'user', confidence: 'high', note: undefined }, item.qty || food.defaultServing.qty, unit)
   return {
     ...next,

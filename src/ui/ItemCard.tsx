@@ -1,7 +1,9 @@
 import { useRef, useState, type PointerEvent } from 'react'
 import { Minus, Plus, X } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import type { Unit } from '../data/types.ts'
+import { formatAmount } from '../parser/portion.ts'
 import type { ParsedItem } from '../parser/types.ts'
 
 const UNITS: Unit[] = ['piece', 'katori', 'plate', 'g']
@@ -15,12 +17,14 @@ function dotClass(confidence: ParsedItem['confidence']): string {
 export function ItemCard({
   item,
   checking,
+  compact = false,
   onQty,
   onName,
   onRemove,
 }: {
   item: ParsedItem
   checking: boolean
+  compact?: boolean
   onQty: (qty: number, unit: Unit) => void
   onName: () => void
   onRemove: () => void
@@ -67,7 +71,7 @@ export function ItemCard({
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
+    <div className="relative shrink-0 overflow-hidden rounded-2xl">
       <div className="absolute inset-0 flex items-center justify-end bg-[oklch(0.48_0.14_35)] pr-4 text-sm font-medium text-[oklch(0.97_0.02_85)]">
         Remove
       </div>
@@ -86,41 +90,53 @@ export function ItemCard({
             {item.name}
             <span className="sr-only">{item.confidence === 'high' ? ', confident' : item.confidence === 'medium' ? ', check this' : ', not sure'}</span>
           </button>
+          {compact && (
+            <button type="button" onClick={() => setOpen((value) => !value)} className="min-h-11 shrink-0 rounded-xl px-2 text-sm text-[oklch(0.4_0.04_50)]" aria-expanded={open}>
+              {formatAmount(item.qty, item.unit)}
+            </button>
+          )}
           <span className="shrink-0 text-sm tabular-nums">{item.kcal} kcal</span>
           <button type="button" onClick={onRemove} aria-label={`Remove ${item.name}`} className="grid size-11 place-items-center rounded-full hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
             <X aria-hidden="true" />
           </button>
         </div>
-        <button type="button" onClick={() => setOpen((value) => !value)} className="min-h-11 rounded-xl px-4 text-left text-sm text-[oklch(0.4_0.04_50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-expanded={open}>
-          {item.qty} × {item.unit}
-          {item.grams > 0 ? ` · ${item.grams}g` : ''}
-        </button>
-        {open && (
-          <div className="mt-1 flex flex-col gap-2 pb-1">
-            <div className="flex items-center gap-2">
-              <button type="button" aria-label="Less" className="grid size-11 place-items-center rounded-full bg-muted hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => onQty(item.qty - 0.5, item.unit)}>
-                <Minus aria-hidden="true" />
-              </button>
-              <span className="min-w-12 text-center font-food text-2xl tabular-nums">{item.qty}</span>
-              <button type="button" aria-label="More" className="grid size-11 place-items-center rounded-full bg-muted hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" onClick={() => onQty(item.qty + 0.5, item.unit)}>
-                <Plus aria-hidden="true" />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {units.map((unit) => (
-                <button
-                  key={unit}
-                  type="button"
-                  aria-pressed={unit === item.unit}
-                  onClick={() => onQty(item.qty, unit)}
-                  className={`min-h-11 rounded-full px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${unit === item.unit ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-accent'}`}
-                >
-                  {unit}
-                </button>
-              ))}
-            </div>
-          </div>
+        {!compact && (
+          <button type="button" onClick={() => setOpen((value) => !value)} className="min-h-11 rounded-xl px-4 text-left text-sm text-[oklch(0.4_0.04_50)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-expanded={open}>
+            {formatAmount(item.qty, item.unit)}
+            {item.grams > 0 && item.unit !== 'g' && item.unit !== 'ml' ? ` · ${item.grams}g` : ''}
+          </button>
         )}
+        <Drawer open={open} onOpenChange={setOpen}>
+          <DrawerContent className="mx-auto max-w-md">
+            <DrawerHeader className="text-left">
+              <DrawerTitle className="font-food text-2xl">{item.name}</DrawerTitle>
+            </DrawerHeader>
+            <div className="flex flex-col gap-3 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+              <div className="flex items-center gap-2">
+                <button type="button" aria-label="Less" className="grid size-11 place-items-center rounded-full bg-muted hover:bg-accent" onClick={() => onQty(item.qty - (item.unit === 'g' || item.unit === 'ml' ? 10 : 0.5), item.unit)}>
+                  <Minus aria-hidden="true" />
+                </button>
+                <span className="min-w-16 text-center font-food text-2xl tabular-nums">{formatAmount(item.qty, item.unit)}</span>
+                <button type="button" aria-label="More" className="grid size-11 place-items-center rounded-full bg-muted hover:bg-accent" onClick={() => onQty(item.qty + (item.unit === 'g' || item.unit === 'ml' ? 10 : 0.5), item.unit)}>
+                  <Plus aria-hidden="true" />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {units.map((unit) => (
+                  <button
+                    key={unit}
+                    type="button"
+                    aria-pressed={unit === item.unit}
+                    onClick={() => onQty(item.qty, unit)}
+                    className={`min-h-11 rounded-full px-3 text-sm ${unit === item.unit ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-accent'}`}
+                  >
+                    {unit}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </DrawerContent>
+        </Drawer>
         {(item.note || item.source === 'ai' || (checking && item.confidence === 'low')) && (
           <div className="flex flex-wrap items-center gap-2 px-4 pb-2">
             {item.source === 'ai' && <Badge variant="secondary">AI estimate</Badge>}

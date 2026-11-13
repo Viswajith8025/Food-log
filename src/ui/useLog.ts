@@ -60,6 +60,8 @@ export function useLog() {
   const [toast, setToast] = useState<string | null>(null)
   const [undoMeal, setUndoMeal] = useState<Meal | null>(null)
   const [picker, setPicker] = useState<number | null>(null)
+  const [openId, setOpenId] = useState<number | null>(null)
+  const [savedPicker, setSavedPicker] = useState<number | null>(null)
   const [checking, setChecking] = useState(false)
   const aliasesRef = useRef(aliases)
   const lockText = useRef<string | null>(null)
@@ -198,6 +200,58 @@ export function useLog() {
     }
   }
 
+  async function persistItems(id: number, items: ParsedItem[]) {
+    const sum = totals(items)
+    await db.meals.update(id, {
+      items,
+      kcal: Math.round(sum.kcal),
+      protein: Math.round(sum.protein * 10) / 10,
+      carbs: Math.round(sum.carbs * 10) / 10,
+      fat: Math.round(sum.fat * 10) / 10,
+    })
+    await refresh(day)
+  }
+
+  async function editSaved(index: number, next: ParsedItem) {
+    const meal = meals.find((row) => row.id === openId)
+    if (meal?.id == null) return
+    await persistItems(meal.id, meal.items.map((item, i) => (i === index ? next : item)))
+  }
+
+  async function removeSavedItem(index: number) {
+    const meal = meals.find((row) => row.id === openId)
+    if (meal?.id == null) return
+    const items = meal.items.filter((_, i) => i !== index)
+    if (items.length === 0) {
+      setOpenId(null)
+      await removeMeal(meal.id)
+      return
+    }
+    await persistItems(meal.id, items)
+  }
+
+  async function moveMeal(which: DayChoice) {
+    const meal = meals.find((row) => row.id === openId)
+    if (meal?.id == null) return
+    await db.meals.update(meal.id, { day: dayKey(which) })
+    setOpenId(null)
+    setToast(which === 'today' ? 'Moved to today.' : 'Moved to yesterday.')
+    await refresh(day)
+  }
+
+  async function chooseSaved(foodId: string) {
+    if (savedPicker == null) return
+    const meal = meals.find((row) => row.id === openId)
+    const current = meal?.items[savedPicker]
+    if (!current || meal?.id == null) return
+    const next = withFood(current, foodId)
+    await persistItems(meal.id, meal.items.map((item, i) => (i === savedPicker ? next : item)))
+    setSavedPicker(null)
+    if (current.query && current.foodId !== foodId) {
+      await remember(current.query, foodId, next.name).catch(() => setToast('Could not remember that.'))
+    }
+  }
+
   async function undoRemove() {
     const meal = undoMeal
     if (!meal) return
@@ -242,6 +296,15 @@ export function useLog() {
       setDrafts((current) => current.filter((_, i) => i !== index))
     },
     chooseFood,
+    openId,
+    setOpenId,
+    openMeal: meals.find((meal) => meal.id === openId) ?? null,
+    savedPicker,
+    setSavedPicker,
+    editSaved,
+    removeSavedItem,
+    moveMeal,
+    chooseSaved,
     saveDraft,
     relog,
     removeMeal,
