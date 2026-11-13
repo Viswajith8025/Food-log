@@ -153,4 +153,8 @@
   input, textarea {
     caret-color: oklch(0.48 0.14 35);
     }
+  #nl-badge-frame {
+    display: none !important;
+    pointer-events: none !important;
+    }
 }

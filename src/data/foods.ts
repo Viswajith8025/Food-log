@@ -165,6 +165,7 @@ export const foods: Food[] = [
   food('namkeen', 'Namkeen', ['namkeen', 'mixture', 'bhujia'], 'snack', 520, 12, 46, 32, { bowl: 30, pack: 40 }, 1, 'bowl', HOME),
   food('banana-chips', 'Banana chips', ['banana chips', 'kela chips', 'nendran chips'], 'snack', 490, 2, 54, 28, { bowl: 30 }, 1, 'bowl', IFCT),
   food('biscuit', 'Biscuit', ['biscuit', 'biscuits', 'marie', 'cookie'], 'snack', 450, 7, 72, 14, { piece: 8 }, 2, 'piece', IFCT),
+  food('oreo', 'Oreo', ['oreo', 'oreos', 'oreo biscuit', 'oreo biscuits', 'oreo cookie'], 'snack', 480, 5, 68, 20, { piece: 11 }, 1, 'piece', 'IFCT 2017 biscuit, cream-filled portion'),
   food('rusk', 'Rusk', ['rusk', 'toast rusk'], 'snack', 420, 8, 70, 12, { piece: 10 }, 2, 'piece', HOME),
   food('roasted-chana', 'Roasted chana', ['roasted chana', 'bhuna chana'], 'snack', 360, 20, 56, 6, { bowl: 40, katori: 40 }, 1, 'bowl', IFCT),
   food('roasted-peanuts', 'Roasted peanuts', ['peanuts', 'peanut', 'moongfali', 'groundnut'], 'snack', 580, 26, 16, 48, { bowl: 30 }, 1, 'bowl', IFCT),

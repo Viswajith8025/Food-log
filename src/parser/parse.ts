@@ -361,6 +361,18 @@ function parseSegment(segment: string, userAliases: UserAlias[]): ParsedItem[] {
   tokens.forEach((token, index) => {
     if (!consumed.has(index) && token.kind === 'word') leftover.push(token.text)
   })
+  if (leftover.length && foodAt.length === 1) {
+    const phrase = tokens
+      .filter((token) => token.kind === 'word' || token.kind === 'food')
+      .map((token) => token.phrase || token.text)
+      .join(' ')
+    const food = getFood(exactFoodId(phrase))
+    if (food) {
+      const { qty, unit } = takeQtyUnit(tokens)
+      return [materialize(food, 'exact', phrase, qty, unit, phrase)]
+    }
+    return items
+  }
   if (leftover.length) {
     const phrase = leftover.join(' ')
     const fuzzy = phrase.length >= 4 ? fuzzyFood(phrase) : null
@@ -380,8 +392,28 @@ function range(start: number, end: number): number[] {
   return indexes
 }
 
+const NUMBER_PREFIXES = Object.keys(NUMBER_WORDS).sort((a, b) => b.length - a.length)
+
+/** "ekchai" is how people type "ek chai" when they are not spacing words. */
+function unglue(text: string): string {
+  return text
+    .split(' ')
+    .map((word) => {
+      if (exactSingleFoodId(word)) return word
+      const digit = /^(\d+(?:\.\d+)?)([a-z]{3,})$/.exec(word)
+      if (digit && exactSingleFoodId(digit[2])) return `${digit[1]} ${digit[2]}`
+      for (const prefix of NUMBER_PREFIXES) {
+        if (prefix.length < 2 || word.length < prefix.length + 3 || !word.startsWith(prefix)) continue
+        const rest = word.slice(prefix.length)
+        if (exactSingleFoodId(rest)) return `${prefix} ${rest}`
+      }
+      return word
+    })
+    .join(' ')
+}
+
 export function parse(text: string, userAliases: UserAlias[] = []): ParsedItem[] {
-  const normalized = normalize(text)
+  const normalized = unglue(normalize(text))
   if (!normalized) return []
   const protectedText = protect(normalized, userAliases)
   const segments = protectedText

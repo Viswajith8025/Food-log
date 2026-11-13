@@ -183,6 +183,13 @@ describe('parse', () => {
     expect(parsed[0].foodId).toBe('aloo-sabzi')
   })
 
+  it('reads a stuck number and keeps a brand with its biscuit', () => {
+    const parsed = parse('ekchai aur ek oreo biscuit')
+    expect(parsed).toHaveLength(2)
+    expect(parsed[0]).toMatchObject({ foodId: 'chai', qty: 1, unit: 'cup', source: 'dictionary' })
+    expect(parsed[1]).toMatchObject({ foodId: 'oreo', qty: 1, unit: 'piece', source: 'dictionary' })
+  })
+
   it('keeps a known item when the rest of the sentence is junk', () => {
     const parsed = parse('2 roti and xyz random food')
     expect(parsed[0].foodId).toBe('roti')

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { dayKey } from '../db/db.ts'
@@ -27,6 +27,7 @@ function useKeyboardOffset() {
 export default function App() {
   useKeyboardOffset()
   const log = useLog()
+  const mealRef = useRef<HTMLInputElement>(null)
   const pickerItem = log.picker == null ? null : log.drafts[log.picker] ?? null
   const dayName = log.day === 'today' ? 'Today' : 'Yesterday'
 
@@ -78,10 +79,10 @@ export default function App() {
       </main>
 
       <form
-        className="border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className="relative z-20 border-t border-border bg-background px-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]"
         onSubmit={(event) => {
           event.preventDefault()
-          void log.saveDraft()
+          void log.saveDraft().then(() => mealRef.current?.focus())
         }}
       >
         {log.recent.length > 0 && (
@@ -114,12 +115,13 @@ export default function App() {
           </div>
         )}
         <Input
+          ref={mealRef}
           id="meal"
           name="meal"
           autoFocus
           value={log.text}
           onChange={(event) => log.setText(event.target.value)}
-          placeholder="2 roti, dal aur ek katori sabzi"
+          placeholder="1 plate poha aur chai"
           aria-label="What did you eat?"
           autoComplete="off"
           autoCorrect="off"
