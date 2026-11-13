@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { dayKey } from '../db/db.ts'
 import { formatMealTime, mealSlot } from '../lib/when.ts'
@@ -34,6 +34,13 @@ export default function App() {
   const savedItem = log.savedPicker == null ? null : log.openMeal?.items[log.savedPicker] ?? null
   const dayName = log.day === 'today' ? 'Today' : 'Yesterday'
   const compactDrafts = log.drafts.length > 3
+  const lot = log.drafts.some((item) => item.note?.includes("That's a lot"))
+  const [confirmLot, setConfirmLot] = useState(false)
+  const lotKey = log.drafts.map((item) => `${item.foodId}:${item.qty}:${item.unit}:${item.kcal}`).join('|')
+
+  useEffect(() => {
+    setConfirmLot(false)
+  }, [lotKey])
 
   function grow(field: HTMLTextAreaElement) {
     field.style.height = 'auto'
@@ -89,9 +96,9 @@ export default function App() {
             ))}
           </div>
         )}
-        {log.meals.length === 0 ? (
+        {log.meals.length === 0 && log.drafts.length === 0 ? (
           <p className="pt-6 text-[oklch(0.4_0.04_50)]">Nothing logged for {dayName.toLowerCase()} yet.</p>
-        ) : (
+        ) : log.meals.length === 0 ? null : (
           <ul className="flex flex-col gap-2">
             {log.meals.map((meal) => {
               const when = new Date(meal.createdAt)
@@ -120,6 +127,11 @@ export default function App() {
         className="relative z-20 shrink-0 border-t border-border bg-background px-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))]"
         onSubmit={(event) => {
           event.preventDefault()
+          if (lot && !confirmLot) {
+            setConfirmLot(true)
+            return
+          }
+          setConfirmLot(false)
           void log.saveDraft().then(() => mealRef.current?.focus())
         }}
       >
@@ -163,8 +175,8 @@ export default function App() {
           enterKeyHint="done"
           className="max-h-[4.5rem] min-h-12 w-full resize-none overflow-y-auto rounded-2xl border border-input bg-card px-3 py-3 text-base leading-5 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
         />
-        <Button type="submit" disabled={log.drafts.length === 0} className="mt-2 h-12 min-h-11 w-full rounded-2xl text-base">
-          {log.drafts.length === 0 ? 'Save' : `Save ${Math.round(log.draftSum.kcal)} kcal`}
+        <Button type="submit" disabled={log.drafts.length === 0} className="mt-2 h-auto min-h-12 w-full rounded-2xl px-3 py-2 text-base whitespace-normal">
+          {log.drafts.length === 0 ? 'Save' : lot && confirmLot ? `Save ${Math.round(log.draftSum.kcal)} kcal? Check quantity` : `Save ${Math.round(log.draftSum.kcal)} kcal`}
         </Button>
       </form>
 

@@ -236,6 +236,13 @@ describe('parse', () => {
     expect(parse('200 ml milk')[0]).toMatchObject({ foodId: 'milk', qty: 200, unit: 'ml', grams: 200 })
   })
 
+  it('weighs plain paneer as the raw block, and keeps sabzi for a katori', () => {
+    const weighed = parse('100g paneer')[0]
+    expect(weighed).toMatchObject({ foodId: 'paneer-cubes', qty: 100, unit: 'g', grams: 100, kcal: 265 })
+    expect(parse('1 katori paneer')[0].foodId).toBe('paneer-sabzi')
+    expect(parse('paneer sabzi')[0].foodId).toBe('paneer-sabzi')
+  })
+
   it('ignores an empty note', () => {
     expect(parse('')).toEqual([])
     expect(parse('   , and  ')).toEqual([])

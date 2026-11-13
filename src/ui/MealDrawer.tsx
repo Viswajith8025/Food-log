@@ -1,6 +1,5 @@
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import type { Meal } from '../db/db.ts'
-import { formatAmount } from '../parser/portion.ts'
 import type { ParsedItem } from '../parser/types.ts'
 import type { Unit } from '../data/types.ts'
 import { formatMealTime, mealSlot } from '../lib/when.ts'
@@ -57,8 +56,7 @@ export function MealDrawer({
                 onQty={(qty, unit) => onQty(index, qty, unit)}
               />
               <p className="px-4 pt-1 text-sm text-[oklch(0.4_0.04_50)]">
-                {formatAmount(item.qty, item.unit)}
-                {item.grams > 0 ? ` · ${item.grams}g` : ''} · P {Math.round(item.macros.protein)} · C {Math.round(item.macros.carbs)} · F {Math.round(item.macros.fat)} · {sourceLabel(item)}
+                P {Math.round(item.macros.protein)} · C {Math.round(item.macros.carbs)} · F {Math.round(item.macros.fat)} · {sourceLabel(item)}
               </p>
             </div>
           ))}

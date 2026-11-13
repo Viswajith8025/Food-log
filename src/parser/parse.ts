@@ -274,6 +274,10 @@ function materialize(
   raw: string,
   score?: number,
 ): ParsedItem {
+  if (via !== 'user' && food.id === 'paneer-sabzi' && unit === 'g' && !/\b(sabzi|curry|gravy)\b/.test(phrase)) {
+    const block = getFood('paneer-cubes')
+    if (block) return materialize(block, via, phrase, qty, unit, raw, score)
+  }
   let chosen = unit
   if (chosen && chosen !== 'g' && chosen !== 'ml' && food.servings[chosen] == null) chosen = null
   const finalQty = qty ?? (chosen ? 1 : food.defaultServing.qty)
